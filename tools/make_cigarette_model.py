@@ -338,35 +338,60 @@ def build_cigarette(name, radius, sides, filter_up):
     return obj
 
 
-def build_pack_contents(brand):
-    """Twenty cigarettes, filters up, joined into one mesh.
+def hero_index(positions):
+    """Which cigarette is the one that gets knocked up out of the pack.
 
-    Joined rather than left as twenty objects because they never move
-    independently, and twenty child transforms on an in-hands prop is waste.
+    Front row, middle. The front row is the one a thumb reaches, and the middle
+    of it is the slot that reads clearly from a first person camera.
+    """
+    front_row_count = PACK_ROWS[0]
+    return front_row_count // 2
+
+
+def build_pack_contents(brand):
+    """Twenty cigarettes, filters up.
+
+    Nineteen are joined into one mesh - they never move, and nineteen child
+    transforms on an in-hands prop is waste. The twentieth is left separate so
+    it can be animated rising out of the pack when the base is knocked, then
+    taken to the mouth. Its origin is at its own base, so raising it is a
+    single Z translation.
     """
     positions, diameter = cigarette_positions()
     radius = diameter / 2.0 * 0.97  # a hair of clearance so they do not z-fight
+    hero_at = hero_index(positions)
 
-    made = []
+    rest = []
+    hero = None
     for index, (x, y) in enumerate(positions):
+        is_hero = index == hero_at
         cig = build_cigarette(
-            "%s_Cig_%02d" % (brand, index), radius, CIG_SIDES_IN_PACK, filter_up=True
+            "%s_Cig_%s" % (brand, "Hero" if is_hero else "%02d" % index),
+            radius, CIG_SIDES_IN_PACK if not is_hero else CIG_SIDES, filter_up=True
         )
         # Sit on the interior floor. With an 84mm cigarette and a 65mm body they
         # protrude 20mm into the lid, which is exactly what the lid covers.
         cig.location = (x, y, WALL)
-        made.append(cig)
+        if is_hero:
+            hero = cig
+        else:
+            rest.append(cig)
 
     bpy.ops.object.select_all(action="DESELECT")
-    for obj in made:
+    for obj in rest:
         obj.select_set(True)
-    bpy.context.view_layer.objects.active = made[0]
+    bpy.context.view_layer.objects.active = rest[0]
     bpy.ops.object.join()
 
     joined = bpy.context.active_object
     joined.name = "%s_Cigarettes" % brand
     set_origin_to(joined, (0.0, 0.0, 0.0))
-    return joined
+
+    # The hero keeps its own origin at its base, so "rise out of the pack" is a
+    # single Z translation and "go to the mouth" rotates about the held end.
+    hero.name = "%s_Cig_Hero" % brand
+    set_origin_to(hero, (hero.location.x, hero.location.y, 0.0))
+    return joined, hero
 
 
 # ---------------------------------------------------------------- pack
@@ -417,11 +442,10 @@ def build_pack_lid(brand, colour, textured=None):
 
 
 def build_brand(brand, colour, textured=None):
-    return [
-        build_pack_body(brand, colour, textured),
-        build_pack_contents(brand),
-        build_pack_lid(brand, colour, textured),
-    ]
+    body = build_pack_body(brand, colour, textured)
+    rest, hero = build_pack_contents(brand)
+    lid = build_pack_lid(brand, colour, textured)
+    return [body, rest, hero, lid]
 
 
 # ---------------------------------------------------------------- export

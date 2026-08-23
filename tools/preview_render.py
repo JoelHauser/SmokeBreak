@@ -125,10 +125,12 @@ def main():
         print("using game textures for: %s" % ", ".join(sorted(mapping)))
 
     for index, (brand, colour, _template_id) in enumerate(builder.BRANDS):
-        body, cigs, lid = builder.build_brand(brand, colour, mapping.get(brand))
+        body, cigs, hero, lid = builder.build_brand(brand, colour, mapping.get(brand))
         x = x0 + index * spacing
-        for obj in (body, cigs, lid):
+        for obj in (body, cigs, hero, lid):
             obj.location.x += x
+        # Knocked up out of the pack, as beat 2 of the animation requires.
+        hero.location.z += 0.022
         # Well past vertical, so the camera sees down into the pack and the
         # twenty filter ends actually read.
         lid.rotation_euler.x = math.radians(-115)

@@ -192,6 +192,64 @@ are photographed from above so no side is visible, and its side is stretched
 from a patch of the front's plain card; Winston has no usable top, so its top is
 filled with the average colour of the front's upper strip.
 
+## The character rig
+
+### extract_skeleton.py
+
+```
+python extract_skeleton.py --game "H:/SPT4.1.X" --out ./out/skeleton.json
+```
+
+`skeleton.bundle` holds the whole rig in 60 KB: 79 bones, an Avatar and an
+Animator. Bones are plain GameObjects with Transforms, so the hierarchy is
+recovered by walking parent/child links and recording local transforms.
+
+**The fingers are called Digits.** Searching the bone list for "finger" or
+"hand" returns nothing and makes the rig look like it has none. Each hand has a
+palm and five three-joint digits:
+
+```
+Base HumanRPalm
+Base HumanRDigit11..13   thumb
+Base HumanRDigit21..23   index      ... through Digit51..53
+```
+
+Bones an animator actually drives:
+
+| Bone | Purpose |
+|---|---|
+| `Weapon_root` | attachment point for a held prop - pack, cigarette, lighter |
+| `IK_S_RPalm` / `IK_S_LPalm` | hand IK targets |
+| `Bend_Goal_Right` / `Bend_Goal_Left` | elbow direction |
+| `weapon_holster` | holstered position |
+| `Camera_animated_3rd` | third person camera |
+
+### build_armature.py
+
+```
+blender --background --python build_armature.py -- --json ./out/skeleton.json     --blend ./out/eft_rig.blend --preview ./out/rig.png
+```
+
+Rebuilds the rig as a Blender armature. Unity is Y-up left-handed and Blender is
+Z-up right-handed; swapping Y and Z does both jobs at once, since it puts up
+where Blender expects it and flips handedness in the same move.
+
+Each bone points at its first child, which is what makes a rig readable rather
+than a cloud of identical stubs. Leaf bones get a short stub, because a
+zero-length bone is silently deleted.
+
+The .blend also contains `Rig_Debug`, a tube mesh along the skeletal bones.
+Armatures do not render, so without it there is no way to check the rig by eye.
+It uses the **Skin** modifier, not Wireframe - wireframe builds from faces, and
+that mesh is edges only, so it silently produces nothing.
+
+Helper bones are excluded from the debug mesh but kept in the armature. They are
+parented to the spine yet positioned out at the hands and hips, so drawing edges
+to them puts a starburst through the chest.
+
+Sanity check: 79 of 79 bones, 1.654 m tall, arms forward in the rest pose, which
+is normal for a first person rig.
+
 ## Tuning
 
 The constants at the top of `make_cigarette_model.py` are the whole interface:

@@ -28,6 +28,7 @@ namespace SmokeBreak
     public class SmokeBreakMod(
         ModHelper modHelper,
         TemplateTable templateTable,
+        GlobalTable globalTable,
         ISptLogger<SmokeBreakMod> logger) : IOnLoad
     {
         /// <summary>The Food/Drink node every consumable hangs off.</summary>
@@ -50,6 +51,8 @@ namespace SmokeBreak
                 return Task.CompletedTask;
             }
 
+            var buffName = RegisterBuff(config);
+
             var converted = 0;
             foreach (var rawId in config.CigaretteIds)
             {
@@ -66,7 +69,7 @@ namespace SmokeBreak
                 props.FoodUseTime = config.UseTimeSeconds;
                 props.FoodEffectType = "afterUse";
                 props.MaxResource = config.SmokesPerPack;
-                props.StimulatorBuffs = config.StimulatorBuffs;
+                props.StimulatorBuffs = buffName;
 
                 // Energy and Hydration are the two factors vanilla food uses.
                 props.EffectsHealth = new Dictionary<HealthFactor, EffectsHealthProperties>
@@ -105,6 +108,53 @@ namespace SmokeBreak
 
             logger.Info($"[SmokeBreak] {converted} of {config.CigaretteIds.Count} cigarette pack(s) made smokable - {config.SmokesPerPack} smoke(s) per pack, {config.UseTimeSeconds}s each, energy {config.Effects.Energy:+0;-0}, hydration {config.Effects.Hydration:+0;-0}.");
             return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Writes the configured buff group into globals and returns the name to put
+        /// on each cigarette. Returns "" when buffs are off, which is a valid value
+        /// for StimulatorBuffs - every vanilla food item that has no buff uses it.
+        ///
+        /// A named group with no entries is left alone deliberately: that is how you
+        /// point cigarettes at an existing vanilla buff group without redefining it.
+        /// </summary>
+        private string RegisterBuff(SmokeBreakConfig config)
+        {
+            var buff = config.Buff;
+            if (buff is null || !buff.Enabled || string.IsNullOrWhiteSpace(buff.Name))
+            {
+                return "";
+            }
+
+            if (buff.Entries.Count == 0)
+            {
+                logger.Info($"[SmokeBreak] referencing existing buff group '{buff.Name}'; no entries defined.");
+                return buff.Name;
+            }
+
+            var buffs = globalTable.Configuration?.Health?.Effects?.Stimulator?.Buffs;
+            if (buffs is null)
+            {
+                logger.Warning("[SmokeBreak] globals has no stimulator buff table, so no buff was registered.");
+                return "";
+            }
+
+            buffs[buff.Name] = buff.Entries.Select(e => new Buff
+            {
+                BuffType = e.BuffType,
+                Chance = e.Chance,
+                Delay = e.Delay,
+                Duration = e.Duration,
+                Value = e.Value,
+                AbsoluteValue = e.AbsoluteValue,
+                SkillName = e.SkillName ?? ""
+            }).ToList();
+
+            var summary = string.Join(", ", buff.Entries.Select(e =>
+                $"{e.BuffType}{(string.IsNullOrWhiteSpace(e.SkillName) ? "" : $"/{e.SkillName}")} {e.Value:+0.##;-0.##} for {e.Duration:0}s"));
+            logger.Info($"[SmokeBreak] registered buff '{buff.Name}': {summary}");
+
+            return buff.Name;
         }
     }
 }

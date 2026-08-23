@@ -19,8 +19,17 @@
   "// useInHandsPrefab": "Model held while smoking. Cigarettes have no in-hands model of their own - an empty value here breaks the player's hands. Must be a usable_items prefab. Alternatives: item_galette/item_galette_container.bundle, item_snacks/item_snacks_borodynsky_container.bundle, item_chocolate/item_alyonka_container.bundle",
   "useInHandsPrefab": "assets/content/weapons/usable_items/item_energy_bar/item_slickers_container.bundle",
 
-  "// stimulatorBuffs": "Name of a buff defined in globals. Left empty for now - adding a custom buff is the next step, not this one.",
-  "stimulatorBuffs": "",
+  "// buff": "Effects applied after smoking. Registered into globals under 'name' and referenced by the cigarettes. Set enabled to false for no buff. Leave entries empty and point name at a vanilla group to reuse one instead.",
+  "// buffTypes": "SkillRate (needs skillName), StaminaRate, MaxStamina, EnergyRate, HydrationRate, HealthRate, Pain, WeightLimit, BodyTemperature.",
+  "buff": {
+    "enabled": true,
+    "name": "Buffs_SmokeBreak",
+    "entries": [
+      { "buffType": "SkillRate", "skillName": "StressResistance", "value": 1, "chance": 1, "delay": 2, "duration": 120, "absoluteValue": true },
+      { "buffType": "StaminaRate", "skillName": "", "value": -1, "chance": 1, "delay": 2, "duration": 120, "absoluteValue": true },
+      { "buffType": "MaxStamina", "skillName": "", "value": -10, "chance": 1, "delay": 2, "duration": 120, "absoluteValue": true }
+    ]
+  },
 
   "// cigaretteIds": "Apollo Soyuz, Malboro, Strike, Wilston.",
   "cigaretteIds": [

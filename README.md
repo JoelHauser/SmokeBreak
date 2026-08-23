@@ -4,7 +4,7 @@ Makes EFT's four cigarette packs smokable. Server mod for SPT 4.1.x.
 
 ## Status
 
-**0.1.0 — phase 1 of a larger idea.**
+**0.2.0 — cigarettes are consumable and carry a buff. Visuals are still placeholder.**
 
 Cigarettes ship as barter items under the "Other" node with no consumable
 properties at all. This mod reparents them onto the Food/Drink node and fills in
@@ -49,8 +49,27 @@ hydration cost is what stops it being free food.
 | `smokesPerPack` | Uses per pack. `1` consumes the whole pack at once |
 | `effects.energy` / `effects.hydration` | Applied per smoke |
 | `itemSound` | `generic`, `food_snack` and `drink` all exist |
-| `stimulatorBuffs` | Name of a buff defined in globals. Empty by default |
+| `buff.enabled` | `false` for no buff at all |
+| `buff.name` | Group name written into globals |
+| `buff.entries` | The buff itself. Empty entries + a vanilla group name reuses that group |
 | `cigaretteIds` | The four packs. Add more item IDs to convert them too |
+
+## The buff
+
+Smoking registers a buff group into globals and points the cigarettes at it.
+Defaults, applied 2 seconds in and lasting 2 minutes:
+
+| Effect | Value | Why |
+|---|---|---|
+| `SkillRate` / StressResistance | +1 | the calming half |
+| `StaminaRate` | -1 | the cost |
+| `MaxStamina` | -10 | the cost |
+
+Calm at the price of wind. Both halves are tunable in config.
+
+Note `HandsTremor` looks tempting for a calming item but does the opposite: every
+vanilla use of it is `Value: 0` with a long `Delay`, which is the pattern for a
+stim's *after-effect* tremor rather than tremor removal.
 
 ## Known caveats
 

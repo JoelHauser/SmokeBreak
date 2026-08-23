@@ -85,13 +85,21 @@ namespace SmokeBreak
                 // UsePrefab, so the hands controller has no model to instantiate and
                 // the player's hands break on use. Vanilla food all points at a
                 // usable_items prefab; borrowing one is what makes them usable at all.
-                if (!string.IsNullOrWhiteSpace(config.UseInHandsPrefab))
+                // Each brand now has its own pack model shipped in this mod's
+                // bundles; the borrowed chocolate bar is only the fallback for
+                // anything not listed.
+                if (!config.InHandsPrefabs.TryGetValue(rawId, out var inHands) || string.IsNullOrWhiteSpace(inHands))
                 {
-                    props.UsePrefab = new Prefab { Path = config.UseInHandsPrefab, Rcid = "" };
+                    inHands = config.UseInHandsPrefab;
+                }
+
+                if (!string.IsNullOrWhiteSpace(inHands))
+                {
+                    props.UsePrefab = new Prefab { Path = inHands, Rcid = "" };
                 }
                 else
                 {
-                    logger.Warning($"[SmokeBreak] useInHandsPrefab is empty, so {item.Name} keeps its blank UsePrefab and WILL break the player's hands when used.");
+                    logger.Warning($"[SmokeBreak] no in-hands prefab for {item.Name}, so it keeps its blank UsePrefab and WILL break the player's hands when used.");
                 }
 
                 if (!string.IsNullOrWhiteSpace(config.ItemSound))

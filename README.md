@@ -4,7 +4,7 @@ Makes EFT's four cigarette packs smokable. Server mod for SPT 4.1.x.
 
 ## Status
 
-**0.2.0 — cigarettes are consumable and carry a buff. Visuals are still placeholder.**
+**0.3.0 — cigarettes are consumable, carry a buff, and you hold an actual pack.**
 
 Cigarettes ship as barter items under the "Other" node with no consumable
 properties at all. This mod reparents them onto the Food/Drink node and fills in
@@ -25,6 +25,7 @@ For each cigarette pack:
 | Property | Value | Why |
 |---|---|---|
 | `_parent` | `5448e8d04bdc2ddf718b4569` | the Food/Drink node |
+| `UsePrefab` | this mod's own bundle | the pack you hold, per brand |
 | `FoodUseTime` | 6 | vanilla food sits between 2 and 9 |
 | `FoodEffectType` | `afterUse` | matches every vanilla food item |
 | `MaxResource` | 20 | smokes per pack, shown as a resource bar |

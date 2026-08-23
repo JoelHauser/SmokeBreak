@@ -33,6 +33,13 @@ namespace SmokeBreak
         public string UseInHandsPrefab { get; set; } =
             "assets/content/weapons/usable_items/item_energy_bar/item_slickers_container.bundle";
 
+        /// <summary>
+        /// Per-item in-hands model, keyed by template id, so each brand holds its
+        /// own pack. Anything not listed falls back to UseInHandsPrefab.
+        /// </summary>
+        [JsonPropertyName("inHandsPrefabs")]
+        public Dictionary<string, string> InHandsPrefabs { get; set; } = new();
+
         [JsonPropertyName("buff")]
         public SmokeBuff Buff { get; set; } = new();
 

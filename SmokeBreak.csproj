@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>SmokeBreak</AssemblyName>
     <RootNamespace>SmokeBreak</RootNamespace>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <ModName>$(AssemblyName)</ModName>
     <DeployToSPT Condition="'$(DeployToSPT)' == ''">false</DeployToSPT>
@@ -38,6 +38,8 @@
 
   <ItemGroup>
     <None Update="config\config.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The in-hands models, built in Unity 2022.3.43f1 to match the game. -->
+    <SmokeBreakBundles Include="bundles\smokebreak\*.bundle" />
   </ItemGroup>
 
   <Target Name="DeployToSPT" AfterTargets="Build" Condition="'$(DeployToSPT)' == 'true'">
@@ -46,6 +48,8 @@
     </PropertyGroup>
     <MakeDir Directories="$(ModDir)\config" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModDir)" />
+    <Copy SourceFiles="bundles.json" DestinationFolder="$(ModDir)" Condition="Exists('bundles.json')" />
+    <Copy SourceFiles="@(SmokeBreakBundles)" DestinationFolder="$(ModDir)\bundles\smokebreak" />
     <Copy SourceFiles="config\config.json" DestinationFolder="$(ModDir)\config" Condition="!Exists('$(ModDir)\config\config.json')" />
   </Target>
 
@@ -58,6 +62,8 @@
     <RemoveDir Directories="$(StagingDir)" />
     <MakeDir Directories="$(ModStageDir)\config" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModStageDir)" />
+    <Copy SourceFiles="bundles.json" DestinationFolder="$(ModStageDir)" Condition="Exists('bundles.json')" />
+    <Copy SourceFiles="@(SmokeBreakBundles)" DestinationFolder="$(ModStageDir)\bundles\smokebreak" />
     <Copy SourceFiles="config\config.json" DestinationFolder="$(ModStageDir)\config" />
     <Copy SourceFiles="README.md" DestinationFolder="$(ModStageDir)" Condition="Exists('README.md')" />
     <Copy SourceFiles="LICENSE" DestinationFolder="$(ModStageDir)" Condition="Exists('LICENSE')" />

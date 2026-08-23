@@ -19,6 +19,14 @@
   "// useInHandsPrefab": "Model held while smoking. Cigarettes have no in-hands model of their own - an empty value here breaks the player's hands. Must be a usable_items prefab. Alternatives: item_galette/item_galette_container.bundle, item_snacks/item_snacks_borodynsky_container.bundle, item_chocolate/item_alyonka_container.bundle",
   "useInHandsPrefab": "assets/content/weapons/usable_items/item_energy_bar/item_slickers_container.bundle",
 
+  "// inHandsPrefabs": "Model held while smoking, per cigarette. These are shipped in this mod's own bundles folder. Anything not listed falls back to useInHandsPrefab.",
+  "inHandsPrefabs": {
+    "573475fb24597737fb1379e1": "smokebreak/pack_apollosoyuz.bundle",
+    "573476d324597737da2adc13": "smokebreak/pack_malboro.bundle",
+    "5734770f24597738025ee254": "smokebreak/pack_strike.bundle",
+    "573476f124597737e04bf328": "smokebreak/pack_wilston.bundle"
+  },
+
   "// buff": "Effects applied after smoking. Registered into globals under 'name' and referenced by the cigarettes. Set enabled to false for no buff. Leave entries empty and point name at a vanilla group to reuse one instead.",
   "// buffTypes": "SkillRate (needs skillName), StaminaRate, MaxStamina, EnergyRate, HydrationRate, HealthRate, Pain, WeightLimit, BodyTemperature.",
   "buff": {

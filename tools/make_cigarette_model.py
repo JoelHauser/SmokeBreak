@@ -119,8 +119,26 @@ def set_origin_to(obj, world_point):
 
 
 def triangle_count(obj):
-    obj.data.calc_loop_triangles()
-    return len(obj.data.loop_triangles)
+    """calc_loop_triangles has been deprecated and undeprecated more than once;
+    fall back to counting polygon fans if it is gone."""
+    try:
+        obj.data.calc_loop_triangles()
+        return len(obj.data.loop_triangles)
+    except Exception:
+        return sum(max(len(p.vertices) - 2, 0) for p in obj.data.polygons)
+
+
+def ensure_fbx_exporter():
+    """Blender has been moving off the legacy io_scene_fbx exporter. Enable it if
+    it is merely switched off, and report honestly if it is actually gone."""
+    if hasattr(bpy.ops.export_scene, "fbx"):
+        return True
+    try:
+        import addon_utils
+        addon_utils.enable("io_scene_fbx", default_set=False, persistent=True)
+    except Exception as exc:
+        print("  could not enable io_scene_fbx: %s" % exc)
+    return hasattr(bpy.ops.export_scene, "fbx")
 
 
 # ---------------------------------------------------------------- geometry
@@ -206,6 +224,22 @@ def main():
     for obj in objects:
         obj.select_set(True)
     bpy.context.view_layer.objects.active = objects[0]
+
+    if not ensure_fbx_exporter():
+        # Do not throw away the geometry just because the exporter moved. Saving
+        # a .blend means the models survive and can be exported by hand.
+        blend_path = os.path.splitext(out_path)[0] + ".blend"
+        bpy.ops.wm.save_as_mainfile(filepath=blend_path)
+        print("")
+        print("=" * 64)
+        print("FBX exporter unavailable in this Blender build.")
+        print("Models were saved instead to:")
+        print("  %s" % blend_path)
+        print("")
+        print("Open that file and export manually with:")
+        print("  Forward -Z, Up Y, Apply Scalings 'FBX All', Scale 1.0")
+        print("=" * 64)
+        return
 
     # Blender is Z-up, Unity is Y-up. These axis settings plus FBX_SCALE_ALL are
     # what make the model arrive upright at File Scale 1, rather than rotated

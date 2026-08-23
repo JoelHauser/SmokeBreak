@@ -8,7 +8,11 @@ Generates the in-hands models and exports an FBX for Unity 2022.3.
 blender --background --python make_cigarette_model.py -- --out C:/temp/cigs.fbx
 ```
 
-Needs Blender 4.2 LTS or similar. Nothing else.
+Needs Blender 4.x or 5.x. Nothing else.
+
+If your Blender build has dropped the legacy FBX exporter, the script notices,
+saves a `.blend` alongside instead of losing the geometry, and prints the manual
+export settings to use (Forward -Z, Up Y, Apply Scalings "FBX All", Scale 1.0).
 
 Three objects come out, so you can decide what the hands hold:
 

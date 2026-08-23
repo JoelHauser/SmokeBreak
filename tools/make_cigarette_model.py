@@ -1,21 +1,26 @@
 """
-Generates cigarette in-hands models for Smoke Break and exports them as FBX
-for Unity 2022.3.
+Generates the Smoke Break in-hands models and exports FBX for Unity 2022.3.
 
 Run headless:
 
-    blender --background --python make_cigarette_model.py -- --out C:/path/cigs.fbx
+    blender --background --python make_cigarette_model.py -- --out C:/path/models
 
-Produces three separate objects so you can pick what the hands actually hold:
+The --out value is a DIRECTORY. One FBX is written per cigarette brand, each
+with its contents at the origin so it drops straight into Unity as a prefab,
+plus a standalone single cigarette:
 
-    Cigarette_Single   one cigarette, paper and filter as two material slots
-    Cigarette_Pack     the closed pack
-    Pack_Lid           the flip-top, a separate object with its hinge on the
-                       origin so it can be rotated open by an animation
+    ApolloSoyuz.fbx    Body + 20 cigarettes + Lid
+    Malboro.fbx
+    Strike.fbx
+    Wilston.fbx
+    Cigarette_Single.fbx
 
-Dimensions are real-world millimetres converted to metres, because Unity and
-EFT both work in metres, and a model authored at the wrong scale is the most
-common reason an in-hands item looks absurd.
+Each pack holds 20 cigarettes in the real 7-6-7 nested arrangement, filters
+facing up, so an opened lid shows twenty filter ends the way a real pack does.
+
+Dimensions are real millimetres converted to metres. Unity and EFT both work in
+metres, and a model authored at the wrong scale is the most common reason an
+in-hands item looks absurd.
 """
 
 import bpy
@@ -28,36 +33,47 @@ import os
 
 MM = 0.001  # author in mm, store in metres
 
-# King size pack, and a standard cigarette.
+# King size pack.
 PACK_W, PACK_H, PACK_D = 55 * MM, 85 * MM, 22 * MM
-LID_H = 20 * MM                       # how much of the top is the flip lid
-CIG_LEN, CIG_RADIUS = 84 * MM, 4 * MM
+LID_H = 20 * MM                     # how much of the top is the flip lid
+WALL = 1.0 * MM                     # card thickness, sets the interior
+
+CIG_LEN = 84 * MM
 FILTER_LEN = 24 * MM
+CIG_RADIUS = 4 * MM                 # the standalone one; in-pack is derived
+
+# Real packs are 7-6-7, nested, which is what makes 20 fit a 55x22 box.
+PACK_ROWS = (7, 6, 7)
 
 BEVEL_WIDTH = 0.6 * MM
 BEVEL_SEGMENTS = 2
-CIG_SIDES = 16                        # low, because it is seen at arm's length
+CIG_SIDES = 16                      # standalone, seen close
+CIG_SIDES_IN_PACK = 8               # twenty per pack, and only the ends show
 
-# Placeholder colours. The UVs are laid out so real textures will land
-# correctly when you swap these for image maps.
-COL_PACK = (0.55, 0.06, 0.06, 1.0)
-COL_LID = (0.50, 0.05, 0.05, 1.0)
 COL_PAPER = (0.92, 0.92, 0.90, 1.0)
 COL_FILTER = (0.72, 0.55, 0.32, 1.0)
+
+# One entry per cigarette item in EFT. The template id is carried here purely so
+# the model and the server config cannot drift apart unnoticed.
+BRANDS = (
+    ("ApolloSoyuz", (0.09, 0.16, 0.38, 1.0), "573475fb24597737fb1379e1"),
+    ("Malboro",     (0.60, 0.07, 0.07, 1.0), "573476d324597737da2adc13"),
+    ("Strike",      (0.87, 0.85, 0.80, 1.0), "5734770f24597738025ee254"),
+    ("Wilston",     (0.72, 0.53, 0.12, 1.0), "573476f124597737e04bf328"),
+)
 
 
 # ---------------------------------------------------------------- utilities
 
-def parse_out_path():
-    """Blender passes script arguments after a bare '--'."""
+def parse_arg(flag, default):
     argv = sys.argv
     if "--" not in argv:
-        return os.path.join(os.getcwd(), "cigarette_models.fbx")
+        return default
     argv = argv[argv.index("--") + 1:]
     for i, a in enumerate(argv):
-        if a in ("--out", "-o") and i + 1 < len(argv):
+        if a == flag and i + 1 < len(argv):
             return argv[i + 1]
-    return os.path.join(os.getcwd(), "cigarette_models.fbx")
+    return default
 
 
 def wipe_scene():
@@ -70,8 +86,11 @@ def wipe_scene():
 
 
 def make_material(name, colour, roughness=0.6):
-    """Principled BSDF. Socket names moved around in Blender 4.x, so set them
-    defensively rather than assuming a fixed layout."""
+    """Principled BSDF. Socket names have moved around across 4.x and 5.x, so
+    set them defensively rather than assuming a fixed layout."""
+    existing = bpy.data.materials.get(name)
+    if existing:
+        return existing
     mat = bpy.data.materials.new(name)
     if not getattr(mat, "use_nodes", True):
         mat.use_nodes = True
@@ -85,9 +104,13 @@ def make_material(name, colour, roughness=0.6):
     return mat
 
 
+def darken(colour, factor=0.82):
+    return (colour[0] * factor, colour[1] * factor, colour[2] * factor, colour[3])
+
+
 def add_bevel(obj, width=BEVEL_WIDTH, segments=BEVEL_SEGMENTS):
-    """Real objects have no perfectly sharp edges. A small bevel is what stops
-    a box reading as programmer art under a specular highlight."""
+    """Real objects have no perfectly sharp edges. A small bevel is what stops a
+    box reading as programmer art under a specular highlight."""
     bpy.context.view_layer.objects.active = obj
     mod = obj.modifiers.new(name="Bevel", type="BEVEL")
     mod.width = width
@@ -120,8 +143,6 @@ def set_origin_to(obj, world_point):
 
 
 def triangle_count(obj):
-    """calc_loop_triangles has been deprecated and undeprecated more than once;
-    fall back to counting polygon fans if it is gone."""
     try:
         obj.data.calc_loop_triangles()
         return len(obj.data.loop_triangles)
@@ -130,8 +151,8 @@ def triangle_count(obj):
 
 
 def ensure_fbx_exporter():
-    """Blender has been moving off the legacy io_scene_fbx exporter. Enable it if
-    it is merely switched off, and report honestly if it is actually gone."""
+    """Blender has been migrating off the legacy io_scene_fbx exporter. Enable
+    it if merely switched off, and report honestly if it is actually gone."""
     if hasattr(bpy.ops.export_scene, "fbx"):
         return True
     try:
@@ -142,131 +163,171 @@ def ensure_fbx_exporter():
     return hasattr(bpy.ops.export_scene, "fbx")
 
 
-# ---------------------------------------------------------------- geometry
+# ---------------------------------------------------------------- cigarettes
 
-def build_pack_body():
-    body_h = PACK_H - LID_H
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, body_h / 2))
-    obj = bpy.context.active_object
-    obj.name = "Cigarette_Pack"
-    obj.scale = (PACK_W, PACK_D, body_h)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    add_bevel(obj)
-    unwrap(obj)
-    obj.data.materials.append(make_material("Cig_Pack", COL_PACK))
-    # Base centre: predictable, and an easy reference when positioning against
-    # the hand bone in Unity.
-    set_origin_to(obj, (0.0, 0.0, 0.0))
-    return obj
+def in_pack_diameter():
+    """Derive the cigarette diameter from the pack interior rather than picking
+    one and hoping it fits. Seven across sets the width limit; three nested rows
+    set the depth limit, since nested rows sit sqrt(3)/2 apart rather than
+    stacking. Whichever is tighter wins."""
+    interior_w = PACK_W - 2 * WALL
+    interior_d = PACK_D - 2 * WALL
+    by_width = interior_w / max(PACK_ROWS)
+    by_depth = interior_d / (1.0 + math.sqrt(3.0))
+    return min(by_width, by_depth)
 
 
-def build_pack_lid():
-    body_h = PACK_H - LID_H
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, body_h + LID_H / 2))
-    obj = bpy.context.active_object
-    obj.name = "Pack_Lid"
-    obj.scale = (PACK_W, PACK_D, LID_H)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    add_bevel(obj)
-    unwrap(obj)
-    obj.data.materials.append(make_material("Cig_Lid", COL_LID))
-    # Origin on the hinge line, the back top edge of the body, so opening the
-    # lid is one rotation on X rather than a rotation plus a correction.
-    set_origin_to(obj, (0.0, PACK_D / 2, body_h))
-    return obj
+def cigarette_positions():
+    """7-6-7, nested, centred on the pack. Returns offsets in metres."""
+    d = in_pack_diameter()
+    row_spacing = d * math.sqrt(3.0) / 2.0
+    total_depth = d + 2 * row_spacing
+    y0 = -total_depth / 2.0 + d / 2.0
+
+    points = []
+    for row_index, count in enumerate(PACK_ROWS):
+        y = y0 + row_index * row_spacing
+        x0 = -(count - 1) * d / 2.0
+        for i in range(count):
+            points.append((x0 + i * d, y))
+    return points, d
 
 
-def build_single_cigarette():
+def build_cigarette(name, radius, sides, filter_up):
+    """One cigarette along +Z with its origin at the base.
+
+    filter_up puts the filter at the TOP, which is how cigarettes sit in a pack
+    and what makes an opened lid show twenty filter ends.
+    """
     bpy.ops.mesh.primitive_cylinder_add(
-        vertices=CIG_SIDES,
-        radius=CIG_RADIUS,
-        depth=CIG_LEN,
-        location=(0, 0, CIG_LEN / 2),
+        vertices=sides, radius=radius, depth=CIG_LEN, location=(0, 0, CIG_LEN / 2)
     )
     obj = bpy.context.active_object
-    obj.name = "Cigarette_Single"
-    # Apply LOCATION as well as scale. bmesh below works in local coordinates, and
-    # without this the mesh runs -42..+42 while the object sits at world z=42, so a
-    # cut at "z = 24mm" actually lands at 66mm and the filter comes out inverted.
-    # Applying location makes local and world agree, which is what the filter test
-    # assumes.
+    obj.name = name
+    # Apply LOCATION as well as scale. bmesh below works in local coordinates,
+    # and without this the mesh runs -42..+42 while the object sits at world
+    # z=42, so a cut at "24mm" lands at 66mm and the filter comes out inverted.
     bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
 
     obj.data.materials.append(make_material("Cig_Paper", COL_PAPER, roughness=0.8))
     obj.data.materials.append(make_material("Cig_Filter", COL_FILTER, roughness=0.9))
 
+    cut_z = CIG_LEN - FILTER_LEN if filter_up else FILTER_LEN
+
     # A default cylinder has ONE quad per side running its whole length, so every
-    # side face has its centre at the midpoint and a "below the filter line" test
-    # catches only the end cap. Cut the mesh at the filter line first, then the
-    # test means something.
+    # side face has its centre at the midpoint and a "past the filter line" test
+    # catches only the end cap. Cut the mesh there first, then the test means
+    # something.
     mesh = obj.data
     bm = bmesh.new()
     bm.from_mesh(mesh)
-
     bmesh.ops.bisect_plane(
         bm,
         geom=bm.verts[:] + bm.edges[:] + bm.faces[:],
-        plane_co=(0.0, 0.0, FILTER_LEN),
+        plane_co=(0.0, 0.0, cut_z),
         plane_no=(0.0, 0.0, 1.0),
         clear_inner=False,
         clear_outer=False,
     )
-
     bm.faces.ensure_lookup_table()
     for face in bm.faces:
-        if face.calc_center_median().z < FILTER_LEN - 1e-6:
+        z = face.calc_center_median().z
+        is_filter = z > cut_z + 1e-6 if filter_up else z < cut_z - 1e-6
+        if is_filter:
             face.material_index = 1
-
     bm.to_mesh(mesh)
     bm.free()
 
     unwrap(obj)
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.shade_smooth()
-    # Filter end: the end held between the fingers, and the end that meets the
-    # lips. Rotating about the origin is then rotating about the grip. Location
-    # was already applied above, so this only confirms the origin is at the base.
     set_origin_to(obj, (0.0, 0.0, 0.0))
     return obj
 
 
+def build_pack_contents(brand):
+    """Twenty cigarettes, filters up, joined into one mesh.
+
+    Joined rather than left as twenty objects because they never move
+    independently, and twenty child transforms on an in-hands prop is waste.
+    """
+    positions, diameter = cigarette_positions()
+    radius = diameter / 2.0 * 0.97  # a hair of clearance so they do not z-fight
+
+    made = []
+    for index, (x, y) in enumerate(positions):
+        cig = build_cigarette(
+            "%s_Cig_%02d" % (brand, index), radius, CIG_SIDES_IN_PACK, filter_up=True
+        )
+        # Sit on the interior floor. With an 84mm cigarette and a 65mm body they
+        # protrude 20mm into the lid, which is exactly what the lid covers.
+        cig.location = (x, y, WALL)
+        made.append(cig)
+
+    bpy.ops.object.select_all(action="DESELECT")
+    for obj in made:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = made[0]
+    bpy.ops.object.join()
+
+    joined = bpy.context.active_object
+    joined.name = "%s_Cigarettes" % brand
+    set_origin_to(joined, (0.0, 0.0, 0.0))
+    return joined
+
+
+# ---------------------------------------------------------------- pack
+
+def build_pack_body(brand, colour):
+    body_h = PACK_H - LID_H
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, body_h / 2))
+    obj = bpy.context.active_object
+    obj.name = "%s_Body" % brand
+    obj.scale = (PACK_W, PACK_D, body_h)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    add_bevel(obj)
+    unwrap(obj)
+    obj.data.materials.append(make_material("%s_Card" % brand, colour))
+    set_origin_to(obj, (0.0, 0.0, 0.0))
+    return obj
+
+
+def build_pack_lid(brand, colour):
+    body_h = PACK_H - LID_H
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, body_h + LID_H / 2))
+    obj = bpy.context.active_object
+    obj.name = "%s_Lid" % brand
+    obj.scale = (PACK_W, PACK_D, LID_H)
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    add_bevel(obj)
+    unwrap(obj)
+    obj.data.materials.append(make_material("%s_LidCard" % brand, darken(colour)))
+    # Origin on the hinge line, the back top edge of the body, so opening the
+    # lid is one rotation on X rather than a rotation plus a correction.
+    set_origin_to(obj, (0.0, PACK_D / 2, body_h))
+    return obj
+
+
+def build_brand(brand, colour):
+    return [
+        build_pack_body(brand, colour),
+        build_pack_contents(brand),
+        build_pack_lid(brand, colour),
+    ]
+
+
 # ---------------------------------------------------------------- export
 
-def main():
-    out_path = parse_out_path()
-    directory = os.path.dirname(out_path)
-    if directory:
-        os.makedirs(directory, exist_ok=True)
-
-    wipe_scene()
-    objects = [build_pack_body(), build_pack_lid(), build_single_cigarette()]
-
+def export(objects, path):
     bpy.ops.object.select_all(action="DESELECT")
     for obj in objects:
         obj.select_set(True)
     bpy.context.view_layer.objects.active = objects[0]
-
-    if not ensure_fbx_exporter():
-        # Do not throw away the geometry just because the exporter moved. Saving
-        # a .blend means the models survive and can be exported by hand.
-        blend_path = os.path.splitext(out_path)[0] + ".blend"
-        bpy.ops.wm.save_as_mainfile(filepath=blend_path)
-        print("")
-        print("=" * 64)
-        print("FBX exporter unavailable in this Blender build.")
-        print("Models were saved instead to:")
-        print("  %s" % blend_path)
-        print("")
-        print("Open that file and export manually with:")
-        print("  Forward -Z, Up Y, Apply Scalings 'FBX All', Scale 1.0")
-        print("=" * 64)
-        return
-
     # Blender is Z-up, Unity is Y-up. These axis settings plus FBX_SCALE_ALL are
     # what make the model arrive upright at File Scale 1, rather than rotated
     # -90 on X and a hundredth of its intended size.
     bpy.ops.export_scene.fbx(
-        filepath=out_path,
+        filepath=path,
         use_selection=True,
         apply_unit_scale=True,
         apply_scale_options="FBX_SCALE_ALL",
@@ -279,20 +340,51 @@ def main():
         bake_space_transform=False,
     )
 
+
+def main():
+    out_dir = parse_arg("--out", os.path.join(os.getcwd(), "models"))
+    os.makedirs(out_dir, exist_ok=True)
+
+    if not ensure_fbx_exporter():
+        print("")
+        print("FBX exporter unavailable in this Blender build.")
+        print("Export by hand with: Forward -Z, Up Y, Apply Scalings 'FBX All', Scale 1.0")
+        return
+
+    positions, diameter = cigarette_positions()
+    summary = []
+
+    for brand, colour, template_id in BRANDS:
+        wipe_scene()
+        objects = build_brand(brand, colour)
+        path = os.path.join(out_dir, "%s.fbx" % brand)
+        export(objects, path)
+        summary.append((brand, template_id, sum(triangle_count(o) for o in objects)))
+
+    wipe_scene()
+    single = build_cigarette("Cigarette_Single", CIG_RADIUS, CIG_SIDES, filter_up=False)
+    export([single], os.path.join(out_dir, "Cigarette_Single.fbx"))
+    single_tris = triangle_count(single)
+
     print("")
-    print("=" * 64)
+    print("=" * 68)
     print("Smoke Break - model export complete")
-    print("=" * 64)
-    for obj in objects:
-        d = obj.dimensions
-        print("  %-18s %5.1f x %5.1f x %5.1f mm   %4d tris"
-              % (obj.name, d.x / MM, d.y / MM, d.z / MM, triangle_count(obj)))
+    print("=" * 68)
+    print("  pack        %.0f x %.0f x %.0f mm, %.0f mm lid" %
+          (PACK_W / MM, PACK_D / MM, PACK_H / MM, LID_H / MM))
+    print("  contents    %d cigarettes, rows %s, filters up" %
+          (len(positions), "-".join(str(r) for r in PACK_ROWS)))
+    print("  cigarette   %.2f mm across, derived from the pack interior" % (diameter / MM))
     print("")
-    print("  written: %s" % out_path)
+    for brand, template_id, tris in summary:
+        print("  %-13s %5d tris   %s" % (brand, tris, template_id))
+    print("  %-13s %5d tris" % ("Single", single_tris))
+    print("")
+    print("  written to: %s" % out_dir)
     print("")
     print("  In Unity, File Scale should read 1. If it reads 0.01 the export")
     print("  scale options did not apply and the model will import tiny.")
-    print("=" * 64)
+    print("=" * 68)
 
 
 if __name__ == "__main__":

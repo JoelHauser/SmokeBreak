@@ -1,11 +1,12 @@
 """
 Renders a preview PNG of the models built by make_cigarette_model.py, so the
-geometry can actually be looked at instead of taken on trust.
+geometry can be looked at rather than taken on trust.
 
     blender --background --python preview_render.py -- --out C:/path/preview.png
 
-Lays the three objects out side by side, lights them, and renders a three
-quarter view. Purely a review aid; it exports nothing.
+Lays the four branded packs out in a row with their lids open, so the twenty
+filter ends inside each are visible, and puts a loose cigarette in front for
+scale. Purely a review aid; it exports nothing.
 """
 
 import bpy
@@ -51,17 +52,19 @@ def pick_engine():
 
 
 def add_lighting():
-    bpy.ops.object.light_add(type="AREA", location=(0.25, -0.3, 0.4))
+    # Area lights of 25W around an 8cm object blow the render out completely.
+    # These are sized for props measured in centimetres.
+    bpy.ops.object.light_add(type="AREA", location=(0.22, -0.30, 0.42))
     key = bpy.context.active_object
-    key.data.energy = 4
-    key.data.size = 0.35
-    key.rotation_euler = (math.radians(45), 0, math.radians(35))
+    key.data.energy = 6
+    key.data.size = 0.45
+    key.rotation_euler = (math.radians(38), 0, math.radians(32))
 
-    bpy.ops.object.light_add(type="AREA", location=(-0.3, -0.2, 0.2))
+    bpy.ops.object.light_add(type="AREA", location=(-0.32, -0.22, 0.24))
     fill = bpy.context.active_object
-    fill.data.energy = 1.2
+    fill.data.energy = 2
     fill.data.size = 0.6
-    fill.rotation_euler = (math.radians(70), 0, math.radians(-40))
+    fill.rotation_euler = (math.radians(68), 0, math.radians(-42))
 
     world = bpy.data.worlds.new("PreviewWorld")
     bpy.context.scene.world = world
@@ -73,22 +76,22 @@ def add_lighting():
         bg.inputs[1].default_value = 1.0
 
 
-def add_camera(target, distance=0.38):
-    bpy.ops.object.camera_add(location=(distance * 0.75, -distance, distance * 0.62))
+def add_camera(target, location):
+    bpy.ops.object.camera_add(location=location)
     cam = bpy.context.active_object
     bpy.context.scene.camera = cam
     constraint = cam.constraints.new(type="TRACK_TO")
     constraint.target = target
     constraint.track_axis = "TRACK_NEGATIVE_Z"
     constraint.up_axis = "UP_Y"
-    cam.data.lens = 60
+    cam.data.lens = 42
     return cam
 
 
 def add_ground():
     """A floor gives the eye a scale reference; without it these read as
     abstract shapes floating in the void."""
-    bpy.ops.mesh.primitive_plane_add(size=0.6, location=(0, 0, 0))
+    bpy.ops.mesh.primitive_plane_add(size=1.2, location=(0, 0, 0))
     plane = bpy.context.active_object
     plane.name = "Ground"
     mat = bpy.data.materials.new("Ground")
@@ -112,36 +115,40 @@ def main():
     builder = load_builder()
     builder.wipe_scene()
 
-    pack = builder.build_pack_body()
-    lid = builder.build_pack_lid()
-    cig = builder.build_single_cigarette()
+    spacing = 0.072
+    count = len(builder.BRANDS)
+    x0 = -(count - 1) * spacing / 2.0
 
-    # Spread them out. The lid keeps its real position relative to the pack so
-    # the flip-top relationship stays readable, and gets tilted open a little to
-    # show the hinge origin doing its job.
-    pack.location.x = -0.055
-    lid.location.x = -0.055
-    lid.rotation_euler.x = math.radians(-55)
+    for index, (brand, colour, _template_id) in enumerate(builder.BRANDS):
+        body, cigs, lid = builder.build_brand(brand, colour)
+        x = x0 + index * spacing
+        for obj in (body, cigs, lid):
+            obj.location.x += x
+        # Well past vertical, so the camera sees down into the pack and the
+        # twenty filter ends actually read.
+        lid.rotation_euler.x = math.radians(-115)
 
-    # Lying along X keeps the cigarette broadside to the camera, so the filter
-    # split is actually visible rather than foreshortened into the distance.
-    cig.location = (-0.005, -0.055, builder.CIG_RADIUS)
-    cig.rotation_euler = (0, math.radians(90), math.radians(-6))
+    # A loose cigarette in front, for scale and to show the filter split.
+    single = builder.build_cigarette(
+        "Cigarette_Single", builder.CIG_RADIUS, builder.CIG_SIDES, filter_up=False
+    )
+    single.location = (-0.02, -0.075, builder.CIG_RADIUS)
+    single.rotation_euler = (0, math.radians(90), math.radians(-4))
 
     add_ground()
     add_lighting()
 
     focus = bpy.data.objects.new("Focus", None)
     bpy.context.collection.objects.link(focus)
-    focus.location = (0.0, -0.02, 0.042)
-    add_camera(focus)
+    focus.location = (0.0, -0.02, 0.05)
+    add_camera(focus, location=(0.12, -0.42, 0.34))
 
     scene = bpy.context.scene
     engine = pick_engine()
     if engine:
         scene.render.engine = engine
-    scene.render.resolution_x = 1100
-    scene.render.resolution_y = 620
+    scene.render.resolution_x = 1280
+    scene.render.resolution_y = 640
     scene.render.film_transparent = False
     scene.render.image_settings.file_format = "PNG"
     # Filmic/AgX view transforms desaturate hard, which made a dark red pack

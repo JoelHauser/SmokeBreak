@@ -1,102 +1,221 @@
 # Smoke Break
 
-Makes EFT's four cigarette packs smokable. Server mod for SPT 4.1.x.
+Makes EFT's cigarettes smokable. Server mod plus client plugin for **SPT 4.1.x**.
 
-## Status
+Cigarettes ship as barter items with no consumable properties at all — you can
+sell them and nothing else. This mod makes all four packs usable, gives smoking
+a real trade-off, and puts an actual cigarette pack in your hands.
 
-**0.3.0 — cigarettes are consumable, carry a buff, and you hold an actual pack.**
+---
 
-Cigarettes ship as barter items under the "Other" node with no consumable
-properties at all. This mod reparents them onto the Food/Drink node and fills in
-the food schema, which is enough for the client to build them as consumables.
+## Status — 0.3.0
 
-Using one plays **EFT's existing hand-to-mouth consume animation** — the same
-one used for food and drink. There is no smoking animation in the game; a search
-of `Assembly-CSharp` turns up nothing for "smok" beyond smoke grenades, muzzle
-smoke and BTR exhaust, and no cigarette strings at all. A real smoking animation
-means authoring a clip and shipping it in an AssetBundle, which is a later step.
+| Feature | State |
+|---|---|
+| All four packs consumable | **working**, verified in game |
+| 20 smokes per pack, resource bar | **working** |
+| Buff: calm at the cost of wind | **working**, verified on a live server |
+| Pack model in hand | **in progress** — reaches the raid at correct scale, placement being tuned |
+| Custom smoking animation | not started, see [Roadmap](#roadmap) |
 
-So: functional now, visually a placeholder.
+The animation you see is EFT's own food-eating animation. That is deliberate:
+there is no smoking animation in the game, and authoring one is a much larger
+job than making the item work.
+
+---
+
+## Installing
+
+1. Stop the server.
+2. Extract `dist/SmokeBreak-0.3.0-SPT4.1.x.zip` into your SPT folder.
+3. Build the client plugin (see [Building](#building)) — it deploys itself and
+   the bundles to `BepInEx/plugins/SmokeBreak/`.
+4. Start the server. **Smoke Break** should appear in the mod list.
+
+### Requirement
+
+`simulateItemsBeingTaken` must be `true` in
+`SPT_Runtime/SPT_Data/configs/insurance.json`. It is by default. The server
+console warns you at startup if it is not.
+
+---
 
 ## What it changes
 
-For each cigarette pack:
+For each of the four cigarette packs:
 
 | Property | Value | Why |
 |---|---|---|
-| `_parent` | `5448e8d04bdc2ddf718b4569` | the Food/Drink node |
-| `UsePrefab` | this mod's own bundle | the pack you hold, per brand |
-| `FoodUseTime` | 6 | vanilla food sits between 2 and 9 |
-| `FoodEffectType` | `afterUse` | matches every vanilla food item |
+| `_parent` | `5448e8d04bdc2ddf718b4569` | the Food/Drink node, which is what makes it consumable |
+| `UsePrefab` | a vanilla usable_items container | hands, animator and animation, borrowed from a real item |
+| `FoodUseTime` | 9 | matches the borrowed animation's length |
 | `MaxResource` | 20 | smokes per pack, shown as a resource bar |
-| `EffectsHealth` | Energy +5, Hydration -3 | see below |
-| `EffectsDamage` | empty | present and empty on all vanilla food |
-| `ItemSound` | `generic` | what cigarettes already carry |
+| `EffectsHealth` | Energy +5, Hydration −3 | nicotine blunting hunger, at a cost |
+| `StimulatorBuffs` | `Buffs_SmokeBreak` | see below |
 
-`AnimationVariantsNumber` is deliberately untouched. All 22 vanilla food items
-sit at 0, which is what cigarettes already have.
+`AnimationVariantsNumber` is deliberately untouched — all 22 vanilla food items
+sit at 0, which is what cigarettes already carry.
 
-Energy is satiety in EFT, so a small gain reads as nicotine blunting hunger. The
-hydration cost is what stops it being free food.
+### The buff
 
-## Config
+Registered into globals and referenced by the packs. Two minutes, starting two
+seconds in:
 
-`config/config.json`, applied at server start.
+| Effect | Value | Role |
+|---|---|---|
+| `SkillRate` / StressResistance | +1 | the calm |
+| `StaminaRate` | −1 | the cost |
+| `MaxStamina` | −10 | the cost |
+
+`HandsTremor` looks like the obvious choice for a calming item and does the
+opposite — every vanilla use of it is `Value: 0` with a long `Delay`, which is
+the pattern for a stim's *after-effect* tremor. Using it would make smoking
+shake your hands.
+
+---
+
+## Configuration
+
+`config/config.json`, applied at server start. The defaults are tuned and need
+no changes.
 
 | Setting | Effect |
 |---|---|
 | `enabled` | `false` leaves cigarettes as barter items |
-| `useTimeSeconds` | Length of the animation |
+| `useTimeSeconds` | Animation length. Must match the borrowed prefab's clip |
 | `smokesPerPack` | Uses per pack. `1` consumes the whole pack at once |
-| `effects.energy` / `effects.hydration` | Applied per smoke |
+| `effects.energy` / `.hydration` | Applied per smoke |
 | `itemSound` | `generic`, `food_snack` and `drink` all exist |
-| `buff.enabled` | `false` for no buff at all |
-| `buff.name` | Group name written into globals |
-| `buff.entries` | The buff itself. Empty entries + a vanilla group name reuses that group |
-| `cigaretteIds` | The four packs. Add more item IDs to convert them too |
+| `useInHandsPrefab` | Which vanilla container to borrow hands and animation from |
+| `inHandsPrefabs` | Per-item model override, by template id |
+| `buff.*` | The buff group. Empty `entries` plus a vanilla name reuses that group |
+| `cigaretteIds` | The four packs. Add ids to convert more items |
 
-## The buff
+---
 
-Smoking registers a buff group into globals and points the cigarettes at it.
-Defaults, applied 2 seconds in and lasting 2 minutes:
+## Repository layout
 
-| Effect | Value | Why |
-|---|---|---|
-| `SkillRate` / StressResistance | +1 | the calming half |
-| `StaminaRate` | -1 | the cost |
-| `MaxStamina` | -10 | the cost |
+```
+SmokeBreak.csproj          server mod (net10.0)
+SmokeBreak*.cs             server mod source
+config/config.json         runtime configuration
 
-Calm at the price of wind. Both halves are tunable in config.
+client/                    BepInEx client plugin (net472)
+  SmokeBreakPlugin.cs      swaps the held model at runtime
 
-Note `HandsTremor` looks tempting for a calming item but does the opposite: every
-vanilla use of it is `Value: 0` with a long `Delay`, which is the pattern for a
-stim's *after-effect* tremor rather than tremor removal.
+bundles/smokebreak/        built AssetBundles, Unity 2022.3.43f1
+bundles.json               unused, kept for reference — see below
 
-## Known caveats
+tools/                     the asset pipeline, all headless
+  make_cigarette_model.py  generates the pack models in Blender
+  preview_render.py        renders them, so they can be checked by eye
+  extract_cig_textures.py  pulls the game's shared texture atlas
+  trace_cig_materials.py   finds which bundle owns a material
+  bake_pack_textures.py    crops and upscales pack art from the atlas
+  build_pack_sheets.py     builds textures from hand-supplied artwork
+  analyse_pack_uvs.py      works out BSG's per-face UV layout
+  extract_skeleton.py      exports EFT's character rig
+  build_armature.py        rebuilds that rig as a Blender armature
+  preview_obj.py           renders any extracted OBJ with a texture
+  out/                     everything the pipeline produced
 
-- **Cigarettes already in your stash** were created without food resource data.
-  They should default to a full pack, but if any behave oddly, dropping and
-  re-acquiring one is the quick check. Setting `smokesPerPack` to `1` sidesteps
-  the resource system entirely.
-- **The animation is a drink animation.** That is expected at this stage.
-- Runs at `OnLoadOrder.GameCallbacks`, well ahead of the 4.1.3 item-table cutoff
-  at `SaveCallbacks`. Only existing items are edited, never added.
+dist/                      release archives
+```
 
-## Releases
+**Nothing is gitignored.** The generated models, extracted game assets, baked
+textures, render previews, built bundles and release archives are all committed,
+so the work can be inspected without running anything.
 
-Release archives are **not** tracked in this repo - `dist/` is gitignored. Build
-one with `-t:PackageRelease`. Tracking them means the zip appears and vanishes
-as you switch branches, which has already caused a stale archive to be published
-once on a sibling project.
-
-Rebuild the archive after **every** fix. `Build` alone updates the installed DLL
-but leaves the zip stale.
+---
 
 ## Building
+
+### Server mod
 
 ```
 dotnet build -c Release -p:SPTPath="H:\SPT4.1.X"
 ```
 
-`-p:DeployToSPT=true` copies into the install, `-t:PackageRelease` builds a zip.
-Requires a .NET 10 SDK.
+Add `-p:DeployToSPT=true` to install, or `-t:PackageRelease` for a zip.
+**Requires a .NET 10 SDK** — the mod targets `net10.0`, because the 4.1 server
+does.
+
+### Client plugin
+
+```
+cd client
+dotnet build -c Release -p:SPTPath="H:\SPT4.1.X" -p:DeployToSPT=true
+```
+
+Targets `net472`. Deploys the DLL and the bundles to
+`BepInEx/plugins/SmokeBreak/`.
+
+### Models
+
+```
+blender --background --python tools/make_cigarette_model.py -- --out tools/out --assets tools/out
+blender --background --python tools/preview_render.py     -- --out tools/out/preview.png
+```
+
+Blender 4.x or 5.x. See [`tools/README.md`](tools/README.md) for the pipeline in
+detail — it documents the extraction, the UV transfer, and several traps that
+cost real time.
+
+### Bundles
+
+Unity **2022.3.43f1**, exactly — hash `85497d293fa1`, matching the game's
+`UnityPlayer.dll`. A different version will not load.
+
+```
+Unity.exe -batchmode -quit -projectPath <proj> -executeMethod SmokeBreakBuild.Build -logFile -
+```
+
+---
+
+## Why the model swap is client-side
+
+Worth writing down, because it is not obvious and it cost an evening.
+
+A `UsePrefab` bundle is **not a model**. EFT's own
+`item_slickers_container.bundle` holds 131 GameObjects: both arms, every finger
+joint, an `AnimatorController`, three `AnimationClip`s, twenty `LActionState`
+behaviours and a `UsableHandsPrefab` component. It is a complete hands package.
+
+Shipping a bare mesh as a `UsePrefab` makes the client hang at *"starting local
+game"* — silently, with no error, waiting for parts that are not there.
+
+So the server mod points `UsePrefab` at a **real** vanilla container, and the
+hands and animation stay BSG's. The client plugin then hides the borrowed item's
+renderers and mounts our pack in its place. EFT never treats our bundle as a
+hands prefab, so that failure cannot recur.
+
+`bundles.json` is kept for reference but is unused — SPT's bundle pipeline is
+not involved at all.
+
+---
+
+## Roadmap
+
+The target is an FDDA-style sequence: take the pack out, flip the lid, knock a
+cigarette up, take it, light it, smoke it, flick it away.
+
+**Done.** Consumable items and the buff. Four textured packs with hinged lids
+and twenty cigarettes each, plus an independently animatable "hero" cigarette
+for the knock-up beat. A loose cigarette. The Crickent lighter, extracted from
+the game. And EFT's character rig rebuilt as a Blender armature
+(`tools/out/eft_rig.blend`) — 79 bones with IK targets, bend goals and
+`Weapon_root`.
+
+**Remaining.** Placement tuning for the held pack; smoke particles and an ember;
+and the animation itself, a two-handed sequence that needs a person with a
+viewport. Every prop and the rig are ready for whoever does it.
+
+---
+
+## Credits
+
+Cigarette artwork derives from the game's own `scrap_d` atlas and from supplied
+reference images. The character rig, lighter and container prefabs are
+Battlestate Games' assets, read from a local install.
+
+MIT licensed — see [LICENSE](LICENSE).

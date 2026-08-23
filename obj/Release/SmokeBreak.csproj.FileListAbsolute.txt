@@ -1,0 +1,14 @@
+H:\SPTMods\SmokeBreak\obj\Release\SmokeBreak.csproj.AssemblyReference.cache
+H:\SPTMods\SmokeBreak\obj\Release\SmokeBreak.GeneratedMSBuildEditorConfig.editorconfig
+H:\SPTMods\SmokeBreak\obj\Release\SmokeBreak.AssemblyInfoInputs.cache
+H:\SPTMods\SmokeBreak\obj\Release\SmokeBreak.AssemblyInfo.cs
+H:\SPTMods\SmokeBreak\obj\Release\SmokeBreak.csproj.CoreCompileInputs.cache
+H:\SPTMods\SmokeBreak\bin\Release\config\config.json
+H:\SPTMods\SmokeBreak\bin\Release\SmokeBreak.deps.json
+H:\SPTMods\SmokeBreak\bin\Release\SmokeBreak.dll
+H:\SPTMods\SmokeBreak\bin\Release\SmokeBreak.pdb
+H:\SPTMods\SmokeBreak\obj\Release\SmokeBreak.dll
+H:\SPTMods\SmokeBreak\obj\Release\refint\SmokeBreak.dll
+H:\SPTMods\SmokeBreak\obj\Release\SmokeBreak.pdb
+H:\SPTMods\SmokeBreak\obj\Release\ref\SmokeBreak.dll
+H:\SPTMods\SmokeBreak\obj\Release\SmokeBreak.sourcelink.json

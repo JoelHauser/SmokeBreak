@@ -1,0 +1,61 @@
+{
+  "format": 1,
+  "restore": {
+    "H:\\SPTMods\\SmokeBreak\\client\\SmokeBreakClient.csproj": {}
+  },
+  "projects": {
+    "H:\\SPTMods\\SmokeBreak\\client\\SmokeBreakClient.csproj": {
+      "version": "0.3.0",
+      "restore": {
+        "projectUniqueName": "H:\\SPTMods\\SmokeBreak\\client\\SmokeBreakClient.csproj",
+        "projectName": "SmokeBreakClient",
+        "projectPath": "H:\\SPTMods\\SmokeBreak\\client\\SmokeBreakClient.csproj",
+        "packagesPath": "C:\\Users\\Hoel\\.nuget\\packages\\",
+        "outputPath": "H:\\SPTMods\\SmokeBreak\\client\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Hoel\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net472"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net472": {
+            "framework": "net472",
+            "targetAlias": "net472",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.400"
+      },
+      "frameworks": {
+        "net472": {
+          "framework": "net472",
+          "targetAlias": "net472",
+          "dependencies": {
+            "Microsoft.NETFramework.ReferenceAssemblies": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[1.0.3, )",
+              "autoReferenced": true
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Users\\Hoel\\.dotnet\\sdk\\10.0.400\\RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

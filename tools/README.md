@@ -157,6 +157,41 @@ them by interpolation, and it normalises positions against the whole pack
 height, so the body and lid pick up the correct lower and upper portions of the
 same artwork with no explicit splitting.
 
+### build_pack_sheets.py
+
+```
+python build_pack_sheets.py --src "./out/upscaled textures" --assets ./out
+```
+
+Builds the packs from hand-supplied artwork instead of the extracted game
+atlas. Run whichever of the two you want last - both write `pack_uvs.json`, and
+the generator uses whatever is there.
+
+The supplied images are photographs and dielines, not UV unwraps, so panels are
+cropped out by rectangle and reassembled into a fixed layout:
+
+```
++------------------+--------+
+|      front       |  side  |   row 1, pack height
++------------------+--------+
+|       top        | bottom |   row 2, pack depth
++------------------+--------+
+```
+
+Front is reused for the back, and side for both sides, with `u_flip` set on the
+back and one side so the artwork wraps round the corner rather than mirroring.
+Real packs are near enough symmetrical, and in first person the back is never
+seen.
+
+The crop rectangles in `SOURCES` were picked by eye and then checked by cropping
+them out and looking - the first pass clipped the "Marlboro" wordmark and cut
+"APOLLO GOLD3" off at the bottom.
+
+Two sources are missing panels, handled rather than ignored: the Apollo packs
+are photographed from above so no side is visible, and its side is stretched
+from a patch of the front's plain card; Winston has no usable top, so its top is
+filled with the average colour of the front's upper strip.
+
 ## Tuning
 
 The constants at the top of `make_cigarette_model.py` are the whole interface:

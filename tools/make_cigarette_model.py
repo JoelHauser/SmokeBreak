@@ -73,7 +73,8 @@ def make_material(name, colour, roughness=0.6):
     """Principled BSDF. Socket names moved around in Blender 4.x, so set them
     defensively rather than assuming a fixed layout."""
     mat = bpy.data.materials.new(name)
-    mat.use_nodes = True
+    if not getattr(mat, "use_nodes", True):
+        mat.use_nodes = True
     bsdf = mat.node_tree.nodes.get("Principled BSDF")
     if bsdf:
         if "Base Color" in bsdf.inputs:
@@ -184,19 +185,38 @@ def build_single_cigarette():
     )
     obj = bpy.context.active_object
     obj.name = "Cigarette_Single"
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    # Apply LOCATION as well as scale. bmesh below works in local coordinates, and
+    # without this the mesh runs -42..+42 while the object sits at world z=42, so a
+    # cut at "z = 24mm" actually lands at 66mm and the filter comes out inverted.
+    # Applying location makes local and world agree, which is what the filter test
+    # assumes.
+    bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
 
     obj.data.materials.append(make_material("Cig_Paper", COL_PAPER, roughness=0.8))
     obj.data.materials.append(make_material("Cig_Filter", COL_FILTER, roughness=0.9))
 
-    # Assign the filter end to slot 1 by face centre, so both ends can be
-    # textured independently without needing a second object.
+    # A default cylinder has ONE quad per side running its whole length, so every
+    # side face has its centre at the midpoint and a "below the filter line" test
+    # catches only the end cap. Cut the mesh at the filter line first, then the
+    # test means something.
     mesh = obj.data
     bm = bmesh.new()
     bm.from_mesh(mesh)
+
+    bmesh.ops.bisect_plane(
+        bm,
+        geom=bm.verts[:] + bm.edges[:] + bm.faces[:],
+        plane_co=(0.0, 0.0, FILTER_LEN),
+        plane_no=(0.0, 0.0, 1.0),
+        clear_inner=False,
+        clear_outer=False,
+    )
+
+    bm.faces.ensure_lookup_table()
     for face in bm.faces:
-        if face.calc_center_median().z < FILTER_LEN:
+        if face.calc_center_median().z < FILTER_LEN - 1e-6:
             face.material_index = 1
+
     bm.to_mesh(mesh)
     bm.free()
 
@@ -204,7 +224,8 @@ def build_single_cigarette():
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.shade_smooth()
     # Filter end: the end held between the fingers, and the end that meets the
-    # lips. Rotating about the origin is then rotating about the grip.
+    # lips. Rotating about the origin is then rotating about the grip. Location
+    # was already applied above, so this only confirms the origin is at the base.
     set_origin_to(obj, (0.0, 0.0, 0.0))
     return obj
 

@@ -4,3 +4,6 @@ obj/
 
 # release archives - deliberately NOT tracked, see README
 dist/
+
+# generated model output
+tools/out/

@@ -28,6 +28,20 @@ scale options did not apply and the model will be a hundredth of its size.
 
 Colours are flat placeholders. UVs are unwrapped and ready for real textures.
 
+## preview_render.py
+
+Renders a PNG of the same three objects so the geometry can be looked at rather
+than taken on trust.
+
+```
+blender --background --python preview_render.py -- --out C:/temp/preview.png
+```
+
+It imports the build functions from `make_cigarette_model.py` rather than
+duplicating them, so the preview cannot drift from what actually gets exported.
+
+Output goes to `tools/out/`, which is gitignored.
+
 ### Tuning
 
 The constants at the top of the script are the whole interface - pack

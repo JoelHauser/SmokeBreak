@@ -1,0 +1,310 @@
+{
+  "ApolloSoyuz": {
+    "texture": "ApolloSoyuz_sheet.png",
+    "faces": {
+      "front": {
+        "uv": [
+          0.0,
+          0.20560747663551404,
+          0.7142857142857143,
+          1.0
+        ],
+        "u_axis": 0,
+        "v_axis": 2,
+        "u_flip": false,
+        "v_flip": false
+      },
+      "back": {
+        "uv": [
+          0.0,
+          0.20560747663551404,
+          0.7142857142857143,
+          1.0
+        ],
+        "u_axis": 0,
+        "v_axis": 2,
+        "u_flip": true,
+        "v_flip": false
+      },
+      "left": {
+        "uv": [
+          0.7142857142857143,
+          0.20560747663551404,
+          1.0,
+          1.0
+        ],
+        "u_axis": 1,
+        "v_axis": 2,
+        "u_flip": false,
+        "v_flip": false
+      },
+      "right": {
+        "uv": [
+          0.7142857142857143,
+          0.20560747663551404,
+          1.0,
+          1.0
+        ],
+        "u_axis": 1,
+        "v_axis": 2,
+        "u_flip": true,
+        "v_flip": false
+      },
+      "top": {
+        "uv": [
+          0.0,
+          0.0,
+          0.7142857142857143,
+          0.20560747663551404
+        ],
+        "u_axis": 0,
+        "v_axis": 1,
+        "u_flip": false,
+        "v_flip": false
+      },
+      "bottom": {
+        "uv": [
+          0.7142857142857143,
+          0.0,
+          1.0,
+          0.20560747663551404
+        ],
+        "u_axis": 0,
+        "v_axis": 1,
+        "u_flip": false,
+        "v_flip": false
+      }
+    }
+  },
+  "Malboro": {
+    "texture": "Malboro_sheet.png",
+    "faces": {
+      "front": {
+        "uv": [
+          0.0,
+          0.20560747663551404,
+          0.7142857142857143,
+          1.0
+        ],
+        "u_axis": 0,
+        "v_axis": 2,
+        "u_flip": false,
+        "v_flip": false
+      },
+      "back": {
+        "uv": [
+          0.0,
+          0.20560747663551404,
+          0.7142857142857143,
+          1.0
+        ],
+        "u_axis": 0,
+        "v_axis": 2,
+        "u_flip": true,
+        "v_flip": false
+      },
+      "left": {
+        "uv": [
+          0.7142857142857143,
+          0.20560747663551404,
+          1.0,
+          1.0
+        ],
+        "u_axis": 1,
+        "v_axis": 2,
+        "u_flip": false,
+        "v_flip": false
+      },
+      "right": {
+        "uv": [
+          0.7142857142857143,
+          0.20560747663551404,
+          1.0,
+          1.0
+        ],
+        "u_axis": 1,
+        "v_axis": 2,
+        "u_flip": true,
+        "v_flip": false
+      },
+      "top": {
+        "uv": [
+          0.0,
+          0.0,
+          0.7142857142857143,
+          0.20560747663551404
+        ],
+        "u_axis": 0,
+        "v_axis": 1,
+        "u_flip": false,
+        "v_flip": false
+      },
+      "bottom": {
+        "uv": [
+          0.7142857142857143,
+          0.0,
+          1.0,
+          0.20560747663551404
+        ],
+        "u_axis": 0,
+        "v_axis": 1,
+        "u_flip": false,
+        "v_flip": false
+      }
+    }
+  },
+  "Strike": {
+    "texture": "Strike_sheet.png",
+    "faces": {
+      "front": {
+        "uv": [
+          0.0,
+          0.20560747663551404,
+          0.7142857142857143,
+          1.0
+        ],
+        "u_axis": 0,
+        "v_axis": 2,
+        "u_flip": false,
+        "v_flip": false
+      },
+      "back": {
+        "uv": [
+          0.0,
+          0.20560747663551404,
+          0.7142857142857143,
+          1.0
+        ],
+        "u_axis": 0,
+        "v_axis": 2,
+        "u_flip": true,
+        "v_flip": false
+      },
+      "left": {
+        "uv": [
+          0.7142857142857143,
+          0.20560747663551404,
+          1.0,
+          1.0
+        ],
+        "u_axis": 1,
+        "v_axis": 2,
+        "u_flip": false,
+        "v_flip": false
+      },
+      "right": {
+        "uv": [
+          0.7142857142857143,
+          0.20560747663551404,
+          1.0,
+          1.0
+        ],
+        "u_axis": 1,
+        "v_axis": 2,
+        "u_flip": true,
+        "v_flip": false
+      },
+      "top": {
+        "uv": [
+          0.0,
+          0.0,
+          0.7142857142857143,
+          0.20560747663551404
+        ],
+        "u_axis": 0,
+        "v_axis": 1,
+        "u_flip": false,
+        "v_flip": false
+      },
+      "bottom": {
+        "uv": [
+          0.7142857142857143,
+          0.0,
+          1.0,
+          0.20560747663551404
+        ],
+        "u_axis": 0,
+        "v_axis": 1,
+        "u_flip": false,
+        "v_flip": false
+      }
+    }
+  },
+  "Wilston": {
+    "texture": "Wilston_sheet.png",
+    "faces": {
+      "front": {
+        "uv": [
+          0.0,
+          0.20560747663551404,
+          0.7142857142857143,
+          1.0
+        ],
+        "u_axis": 0,
+        "v_axis": 2,
+        "u_flip": false,
+        "v_flip": false
+      },
+      "back": {
+        "uv": [
+          0.0,
+          0.20560747663551404,
+          0.7142857142857143,
+          1.0
+        ],
+        "u_axis": 0,
+        "v_axis": 2,
+        "u_flip": true,
+        "v_flip": false
+      },
+      "left": {
+        "uv": [
+          0.7142857142857143,
+          0.20560747663551404,
+          1.0,
+          1.0
+        ],
+        "u_axis": 1,
+        "v_axis": 2,
+        "u_flip": false,
+        "v_flip": false
+      },
+      "right": {
+        "uv": [
+          0.7142857142857143,
+          0.20560747663551404,
+          1.0,
+          1.0
+        ],
+        "u_axis": 1,
+        "v_axis": 2,
+        "u_flip": true,
+        "v_flip": false
+      },
+      "top": {
+        "uv": [
+          0.0,
+          0.0,
+          0.7142857142857143,
+          0.20560747663551404
+        ],
+        "u_axis": 0,
+        "v_axis": 1,
+        "u_flip": false,
+        "v_flip": false
+      },
+      "bottom": {
+        "uv": [
+          0.7142857142857143,
+          0.0,
+          1.0,
+          0.20560747663551404
+        ],
+        "u_axis": 0,
+        "v_axis": 1,
+        "u_flip": false,
+        "v_flip": false
+      }
+    }
+  }
+}

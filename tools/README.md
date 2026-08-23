@@ -66,6 +66,61 @@ It has already caught two bugs that would otherwise have reached Unity.
 
 Output goes to `tools/out/`, which is gitignored.
 
+## Game asset extraction
+
+Three scripts pull the real cigarette assets out of EFT. They need `UnityPy`:
+
+```
+pip install UnityPy
+```
+
+### extract_cig_textures.py
+
+```
+python extract_cig_textures.py --game "H:/SPT4.1.X" --out ./out/textures
+```
+
+The four barter bundles are ~26 KB each and contain **no textures at all** -
+only meshes and a material pointer. Every cigarette pack shares one atlas,
+`assets/content/materials/scrap_d.bundle`, which holds a 2048x2048 albedo
+(`scrap_d`) and a 1024x1024 normal (`scrap_n`) covering every barter item in
+the game.
+
+The dependency is recorded in `StreamingAssets/Windows/Windows.json`, which is
+how the atlas was found rather than by guessing.
+
+### trace_cig_materials.py
+
+Reports each bundle's external references. All four packs point at the same
+material `path_id`, which is what first suggested a shared atlas.
+
+### preview_authentic.py
+
+```
+blender --background --python preview_authentic.py -- --assets ./out --out ./out/authentic.png
+```
+
+Imports BSG's own pack meshes and renders them with the game atlas, to confirm
+the UVs land before anything is built on top. They do.
+
+**Atlas regions**, read from each mesh's UVs rather than eyeballed:
+
+| Brand | Atlas pixels (2048x2048) |
+|---|---|
+| ApolloSoyuz | x 1471-1699, y 1886-2046 |
+| Malboro | x 1815-2040, y 565-754 |
+| Strike | x 1946-2048, y 1040-1352 |
+| Wilston | x 1816-2041, y 722-910 |
+
+**Two orientation traps.** UnityPy writes the OBJ Z-up, so asking Blender to
+convert from Y-up lays the pack on its back. And BSG authored the meshes with
+-Z as up, so the artwork imports upside down; a 180 degree roll about Y rights
+it while keeping the printed face pointing the same way. Both are handled in
+`preview_authentic.py`.
+
+BSG's packs measure 60.6 x 27.3 x 94.8 mm, noticeably larger than the real
+55 x 22 x 85 the generator uses.
+
 ## Tuning
 
 The constants at the top of `make_cigarette_model.py` are the whole interface:

@@ -151,37 +151,150 @@ namespace SmokeBreakClient
                     return;
                 }
 
-                var handsPrefab = root.GetComponentInChildren<UsableHandsPrefab>(true);
-                if (handsPrefab == null || handsPrefab.ItemSpawnTransform == null)
+                // The controller object is not necessarily the prefab root, so try
+                // downwards, then upwards, then the scene. Logged either way,
+                // because "not found" on its own says nothing about where to look.
+                var handsPrefab = root.GetComponentInChildren<UsableHandsPrefab>(true)
+                                  ?? root.GetComponentInParent<UsableHandsPrefab>()
+                                  ?? UnityEngine.Object.FindObjectOfType<UsableHandsPrefab>();
+
+                if (handsPrefab == null)
                 {
-                    SmokeBreakPlugin.Log.LogWarning("[SmokeBreak] no UsableHandsPrefab/ItemSpawnTransform found.");
+                    SmokeBreakPlugin.Log.LogWarning("[SmokeBreak] no UsableHandsPrefab anywhere. Controller object was '"
+                        + root.name + "'. Hierarchy follows:");
+                    DumpHierarchy(root.transform, 0, 3);
+
+                    var anyWeaponPrefab = root.GetComponentInChildren<WeaponPrefab>(true);
+                    SmokeBreakPlugin.Log.LogWarning("[SmokeBreak] WeaponPrefab in children: "
+                        + (anyWeaponPrefab == null ? "none" : anyWeaponPrefab.GetType().Name));
                     return;
                 }
 
-                var prefab = PackModels.Get(templateId);
-                if (prefab == null) return;
-
-                // Hide whatever the borrowed container was carrying. Disabling
-                // rather than destroying, because the controller still owns it
-                // and may touch it on teardown.
-                foreach (var renderer in handsPrefab.Renderers)
+                if (handsPrefab.ItemSpawnTransform == null)
                 {
-                    if (renderer != null) renderer.enabled = false;
+                    // The component exists but has no mount point. Fall back to
+                    // the transform the borrowed model actually hangs on.
+                    SmokeBreakPlugin.Log.LogWarning("[SmokeBreak] ItemSpawnTransform is null on "
+                        + handsPrefab.name + "; falling back to the first renderer's transform.");
+                    // NOT simply the first renderer. Renderers comes from
+                    // WeaponPrefab, and its first entry is MuzzleJetCombinedMesh -
+                    // an invisible muzzle-flash mesh every weapon prefab carries.
+                    // Mounting there put the pack on nothing, and disabling the
+                    // whole list took the real model with it.
+                    var model = PickItemRenderer(handsPrefab);
+                    if (model != null)
+                    {
+                        MountOn(model.transform, handsPrefab, templateId);
+                        return;
+                    }
+                    SmokeBreakPlugin.Log.LogWarning("[SmokeBreak] no item renderer among "
+                        + handsPrefab.Renderers.Length + ": " + DescribeRenderers(handsPrefab));
+                    SmokeBreakPlugin.Log.LogWarning("[SmokeBreak] no renderers to fall back to either.");
+                    return;
                 }
 
-                var mount = handsPrefab.ItemSpawnTransform;
-                var instance = UnityEngine.Object.Instantiate(prefab, mount, false);
-                instance.name = "SmokeBreak_" + prefab.name;
-                instance.transform.localPosition = Vector3.zero;
-                instance.transform.localRotation = Quaternion.identity;
-
-                SmokeBreakPlugin.Log.LogInfo(
-                    "[SmokeBreak] mounted " + instance.name + " on " + mount.name + " for " + templateId);
+                MountOn(handsPrefab.ItemSpawnTransform, handsPrefab, templateId);
             }
             catch (Exception ex)
             {
                 // Never let a cosmetic swap take the raid down with it.
                 SmokeBreakPlugin.Log.LogError("[SmokeBreak] swap failed: " + ex);
+            }
+        }
+
+        private static void MountOn(Transform mount, UsableHandsPrefab handsPrefab, string templateId)
+        {
+            var prefab = PackModels.Get(templateId);
+            if (prefab == null || mount == null) return;
+
+            // Hide every part of the borrowed item, not just the largest. The
+            // sugar container is a box, a cap and nine loose cubes; hiding only
+            // the box would leave the cubes floating in mid air. Effect meshes
+            // are left alone, which is what blanking the whole list got wrong.
+            foreach (var r in handsPrefab.Renderers)
+            {
+                if (r == null) continue;
+                var n = r.gameObject.name;
+                if (n.IndexOf("muzzle", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                if (n.IndexOf("jet", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                if (n.IndexOf("shell", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                r.enabled = false;
+            }
+
+            var instance = UnityEngine.Object.Instantiate(prefab, mount, false);
+            instance.name = "SmokeBreak_" + prefab.name;
+            instance.transform.localPosition = Vector3.zero;
+            instance.transform.localRotation = Quaternion.identity;
+
+            // Report where it actually landed. "Mounted" on its own told us
+            // nothing last time - the pack was mounted and invisible.
+            var bounds = "no renderer";
+            var rend = instance.GetComponentInChildren<Renderer>(true);
+            if (rend != null)
+            {
+                bounds = "world " + rend.bounds.center.ToString("F3") + " size " + rend.bounds.size.ToString("F3");
+            }
+
+            SmokeBreakPlugin.Log.LogInfo(
+                "[SmokeBreak] mounted " + instance.name + " on " + mount.name
+                + " | mount world " + mount.position.ToString("F3")
+                + " | " + bounds);
+        }
+
+        /// <summary>
+        /// The held item's renderer, told apart from the effect meshes a weapon
+        /// prefab always carries. EFT names item meshes item_&lt;thing&gt;_LOD0, so
+        /// prefer those and never take a muzzle or jet mesh.
+        /// </summary>
+        private static Renderer PickItemRenderer(UsableHandsPrefab handsPrefab)
+        {
+            Renderer best = null;
+            var bestSize = -1f;
+
+            foreach (var r in handsPrefab.Renderers)
+            {
+                if (r == null) continue;
+                var name = r.gameObject.name;
+                if (name.IndexOf("muzzle", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                if (name.IndexOf("jet", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+                if (name.IndexOf("shell", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+
+                // Prefer a name that looks like an item mesh; otherwise fall back
+                // to the largest remaining renderer, which is the model itself.
+                var looksLikeItem = name.StartsWith("item_", StringComparison.OrdinalIgnoreCase);
+                var size = r.bounds.size.magnitude + (looksLikeItem ? 1000f : 0f);
+                if (size > bestSize)
+                {
+                    bestSize = size;
+                    best = r;
+                }
+            }
+
+            return best;
+        }
+
+        private static string DescribeRenderers(UsableHandsPrefab handsPrefab)
+        {
+            var names = new List<string>();
+            foreach (var r in handsPrefab.Renderers)
+            {
+                names.Add(r == null ? "<null>" : r.gameObject.name);
+            }
+            return string.Join(", ", names.ToArray());
+        }
+
+        private static void DumpHierarchy(Transform t, int depth, int maxDepth)
+        {
+            if (t == null || depth > maxDepth) return;
+            var components = "";
+            foreach (var c in t.GetComponents<Component>())
+            {
+                if (c != null) components += c.GetType().Name + " ";
+            }
+            SmokeBreakPlugin.Log.LogWarning("[SmokeBreak]   " + new string(' ', depth * 2) + t.name + "  [" + components.Trim() + "]");
+            for (var i = 0; i < t.childCount && i < 12; i++)
+            {
+                DumpHierarchy(t.GetChild(i), depth + 1, maxDepth);
             }
         }
     }

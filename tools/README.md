@@ -121,6 +121,42 @@ it while keeping the printed face pointing the same way. Both are handled in
 BSG's packs measure 60.6 x 27.3 x 94.8 mm, noticeably larger than the real
 55 x 22 x 85 the generator uses.
 
+### bake_pack_textures.py
+
+```
+python bake_pack_textures.py --assets ./out --scale 4
+```
+
+Crops each pack's artwork out of the atlas, upscales it 4x with Lanczos, and
+writes `<Brand>_albedo.png` plus `pack_uvs.json`. The generator picks those up
+automatically and skins the packs with them; without them it falls back to the
+flat placeholder colours.
+
+BSG's pack proportions are deliberately **not** copied. Those meshes are barter
+props that never reach the player's hands, so only the artwork is worth taking.
+
+Source faces are tiny - the fronts are around 76x118 px - which is why the
+upscale matters. Lanczos keeps the lettering legible where nearest would just
+enlarge the pixels and bilinear would smear them.
+
+The mapping records, per face, its UV rect and which local axis drives u and v,
+so artwork laid out one way on a 60.6 x 27.3 x 94.8 mm prop lands correctly on
+a 55 x 22 x 85 mm pack.
+
+**Two conventions worth knowing**, both settled by rendering rather than by
+reasoning - handedness arguments got them wrong twice:
+
+- The vertices are never mirrored to correct BSG's -Z-up. Mirroring reverses
+  handedness, which silently inverts the flip detection. The flip is applied in
+  two narrow places instead: naming the face, and sampling vertical position.
+- `u_flip` is stored **inverted**, because BSG's horizontal axis runs opposite
+  to the generated box's.
+
+The generator applies UVs *before* the bevel, so the bevel's new faces inherit
+them by interpolation, and it normalises positions against the whole pack
+height, so the body and lid pick up the correct lower and upper portions of the
+same artwork with no explicit splitting.
+
 ## Tuning
 
 The constants at the top of `make_cigarette_model.py` are the whole interface:

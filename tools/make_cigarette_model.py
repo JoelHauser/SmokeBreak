@@ -25,6 +25,7 @@ in-hands item looks absurd.
 
 import bpy
 import bmesh
+import json
 import math
 import sys
 import os
@@ -163,6 +164,98 @@ def ensure_fbx_exporter():
     return hasattr(bpy.ops.export_scene, "fbx")
 
 
+
+# ------------------------------------------------------- atlas texturing
+
+FACE_BY_NORMAL = {
+    (0, -1, 0): "front",
+    (0, 1, 0): "back",
+    (-1, 0, 0): "left",
+    (1, 0, 0): "right",
+    (0, 0, 1): "top",
+    (0, 0, -1): "bottom",
+}
+
+
+def dominant_face(normal):
+    axis = max(range(3), key=lambda i: abs(normal[i]))
+    key = [0, 0, 0]
+    key[axis] = 1 if normal[axis] > 0 else -1
+    return FACE_BY_NORMAL.get(tuple(key))
+
+
+def apply_atlas_uvs(obj, faces_map):
+    """Project each box face into its slice of the brand texture.
+
+    Positions are normalised against the WHOLE pack, not against this object,
+    which is what makes the body and lid pick up the correct upper and lower
+    portions of the same artwork without any explicit splitting.
+    """
+    extents = {
+        0: (-PACK_W / 2.0, PACK_W / 2.0),
+        1: (-PACK_D / 2.0, PACK_D / 2.0),
+        2: (0.0, PACK_H),
+    }
+
+    mesh = obj.data
+    uv_layer = mesh.uv_layers.active or mesh.uv_layers.new(name="UVMap")
+
+    for poly in mesh.polygons:
+        name = dominant_face(poly.normal)
+        spec = faces_map.get(name) if name else None
+        if not spec:
+            continue
+        u0, v0, u1, v1 = spec["uv"]
+        ax_u, ax_v = spec["u_axis"], spec["v_axis"]
+        lo_u, hi_u = extents[ax_u]
+        lo_v, hi_v = extents[ax_v]
+
+        for loop_index in poly.loop_indices:
+            co = mesh.vertices[mesh.loops[loop_index].vertex_index].co
+            tu = (co[ax_u] - lo_u) / (hi_u - lo_u)
+            tv = (co[ax_v] - lo_v) / (hi_v - lo_v)
+            if spec["u_flip"]:
+                tu = 1.0 - tu
+            if spec["v_flip"]:
+                tv = 1.0 - tv
+            uv_layer.data[loop_index].uv = (u0 + tu * (u1 - u0), v0 + tv * (v1 - v0))
+
+
+def brand_material(brand, texture_path):
+    name = "%s_Albedo" % brand
+    existing = bpy.data.materials.get(name)
+    if existing:
+        return existing
+    mat = bpy.data.materials.new(name)
+    if not getattr(mat, "use_nodes", True):
+        mat.use_nodes = True
+    nt = mat.node_tree
+    bsdf = nt.nodes.get("Principled BSDF")
+    tex = nt.nodes.new("ShaderNodeTexImage")
+    tex.image = bpy.data.images.load(texture_path)
+    if bsdf:
+        nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+        if "Roughness" in bsdf.inputs:
+            bsdf.inputs["Roughness"].default_value = 0.78
+    return mat
+
+
+def load_pack_mapping(assets_dir):
+    """Returns {brand: (faces_map, texture_path)} or {} when the baked textures
+    are not present, in which case the flat placeholder colours are used."""
+    path = os.path.join(assets_dir, "pack_uvs.json")
+    if not os.path.isfile(path):
+        return {}
+    with open(path, encoding="utf-8") as fh:
+        data = json.load(fh)
+    out = {}
+    for brand, entry in data.items():
+        tex = os.path.join(assets_dir, "textures", entry["texture"])
+        if os.path.isfile(tex):
+            out[brand] = (entry["faces"], tex)
+    return out
+
+
 # ---------------------------------------------------------------- cigarettes
 
 def in_pack_diameter():
@@ -278,41 +371,56 @@ def build_pack_contents(brand):
 
 # ---------------------------------------------------------------- pack
 
-def build_pack_body(brand, colour):
+def _finish_pack_part(obj, brand, colour, textured, origin, suffix):
+    """Shared tail for the body and the lid.
+
+    Order matters. Location is applied first so the mesh sits in pack space,
+    which is what apply_atlas_uvs normalises against - and the origin is only
+    moved afterwards, because moving it first would shift those coordinates out
+    from under the projection. The bevel comes after the UVs so its new faces
+    inherit them by interpolation instead of missing the mapping entirely.
+    """
+    bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
+
+    if textured:
+        faces_map, texture_path = textured
+        apply_atlas_uvs(obj, faces_map)
+        obj.data.materials.append(brand_material(brand, texture_path))
+    else:
+        unwrap(obj)
+        obj.data.materials.append(make_material("%s_%s" % (brand, suffix), colour))
+
+    add_bevel(obj)
+    set_origin_to(obj, origin)
+    return obj
+
+
+def build_pack_body(brand, colour, textured=None):
     body_h = PACK_H - LID_H
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, body_h / 2))
     obj = bpy.context.active_object
     obj.name = "%s_Body" % brand
     obj.scale = (PACK_W, PACK_D, body_h)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    add_bevel(obj)
-    unwrap(obj)
-    obj.data.materials.append(make_material("%s_Card" % brand, colour))
-    set_origin_to(obj, (0.0, 0.0, 0.0))
-    return obj
+    return _finish_pack_part(obj, brand, colour, textured, (0.0, 0.0, 0.0), "Card")
 
 
-def build_pack_lid(brand, colour):
+def build_pack_lid(brand, colour, textured=None):
     body_h = PACK_H - LID_H
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, body_h + LID_H / 2))
     obj = bpy.context.active_object
     obj.name = "%s_Lid" % brand
     obj.scale = (PACK_W, PACK_D, LID_H)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    add_bevel(obj)
-    unwrap(obj)
-    obj.data.materials.append(make_material("%s_LidCard" % brand, darken(colour)))
     # Origin on the hinge line, the back top edge of the body, so opening the
     # lid is one rotation on X rather than a rotation plus a correction.
-    set_origin_to(obj, (0.0, PACK_D / 2, body_h))
-    return obj
+    return _finish_pack_part(obj, brand, darken(colour), textured,
+                             (0.0, PACK_D / 2, body_h), "LidCard")
 
 
-def build_brand(brand, colour):
+def build_brand(brand, colour, textured=None):
     return [
-        build_pack_body(brand, colour),
+        build_pack_body(brand, colour, textured),
         build_pack_contents(brand),
-        build_pack_lid(brand, colour),
+        build_pack_lid(brand, colour, textured),
     ]
 
 
@@ -351,15 +459,19 @@ def main():
         print("Export by hand with: Forward -Z, Up Y, Apply Scalings 'FBX All', Scale 1.0")
         return
 
+    assets_dir = parse_arg("--assets", out_dir)
+    mapping = load_pack_mapping(assets_dir)
+
     positions, diameter = cigarette_positions()
     summary = []
 
     for brand, colour, template_id in BRANDS:
         wipe_scene()
-        objects = build_brand(brand, colour)
+        objects = build_brand(brand, colour, mapping.get(brand))
         path = os.path.join(out_dir, "%s.fbx" % brand)
         export(objects, path)
-        summary.append((brand, template_id, sum(triangle_count(o) for o in objects)))
+        summary.append((brand, template_id, sum(triangle_count(o) for o in objects),
+                        "game texture" if brand in mapping else "flat colour"))
 
     wipe_scene()
     single = build_cigarette("Cigarette_Single", CIG_RADIUS, CIG_SIDES, filter_up=False)
@@ -376,8 +488,8 @@ def main():
           (len(positions), "-".join(str(r) for r in PACK_ROWS)))
     print("  cigarette   %.2f mm across, derived from the pack interior" % (diameter / MM))
     print("")
-    for brand, template_id, tris in summary:
-        print("  %-13s %5d tris   %s" % (brand, tris, template_id))
+    for brand, template_id, tris, skin in summary:
+        print("  %-13s %5d tris   %-14s %s" % (brand, tris, skin, template_id))
     print("  %-13s %5d tris" % ("Single", single_tris))
     print("")
     print("  written to: %s" % out_dir)

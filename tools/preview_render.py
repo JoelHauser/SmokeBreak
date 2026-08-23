@@ -119,8 +119,13 @@ def main():
     count = len(builder.BRANDS)
     x0 = -(count - 1) * spacing / 2.0
 
+    assets = os.path.dirname(os.path.abspath(out_path))
+    mapping = builder.load_pack_mapping(assets)
+    if mapping:
+        print("using game textures for: %s" % ", ".join(sorted(mapping)))
+
     for index, (brand, colour, _template_id) in enumerate(builder.BRANDS):
-        body, cigs, lid = builder.build_brand(brand, colour)
+        body, cigs, lid = builder.build_brand(brand, colour, mapping.get(brand))
         x = x0 + index * spacing
         for obj in (body, cigs, lid):
             obj.location.x += x

@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>SmokeBreak</AssemblyName>
+    <RootNamespace>SmokeBreak</RootNamespace>
+    <Version>0.1.0</Version>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <ModName>$(AssemblyName)</ModName>
+    <DeployToSPT Condition="'$(DeployToSPT)' == ''">false</DeployToSPT>
+  </PropertyGroup>
+
+  <!--
+    Build with:
+      dotnet build -c Release -p:SPTPath="H:\SPT4.1.X"
+    Add -p:DeployToSPT=true to copy into the install, or -t:PackageRelease for a zip.
+    Needs a .NET 10 SDK; the one on PATH may be older.
+  -->
+  <PropertyGroup>
+    <SPTPath Condition="'$(SPTPath)' == ''">$(SPT_PATH)</SPTPath>
+    <SPTPath Condition="'$(SPTPath)' != ''">$(SPTPath.TrimEnd('\'))</SPTPath>
+    <SPTRuntimePath>$(SPTPath)\SPT_Runtime</SPTRuntimePath>
+  </PropertyGroup>
+
+  <Target Name="ValidateSPTPath" BeforeTargets="BeforeBuild">
+    <Error Condition="'$(SPTPath)' == ''" Text="SPTPath is not set. e.g. -p:SPTPath=H:\SPT4.1.X" />
+    <Error Condition="!Exists('$(SPTRuntimePath)\SPTarkov.Server.Core.dll')" Text="SPTPath ('$(SPTPath)') does not contain SPT_Runtime\SPTarkov.Server.Core.dll" />
+  </Target>
+
+  <ItemGroup>
+    <Reference Include="SPTarkov.Server.Core"><HintPath>$(SPTRuntimePath)\SPTarkov.Server.Core.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="SPTarkov.Common"><HintPath>$(SPTRuntimePath)\SPTarkov.Common.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="SPTarkov.DI"><HintPath>$(SPTRuntimePath)\SPTarkov.DI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="SemanticVersioning"><HintPath>$(SPTRuntimePath)\SemanticVersioning.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="config\config.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="DeployToSPT" AfterTargets="Build" Condition="'$(DeployToSPT)' == 'true'">
+    <PropertyGroup>
+      <ModDir>$(SPTPath)\SPT_Runtime\user\mods\$(ModName)</ModDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(ModDir)\config" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModDir)" />
+    <Copy SourceFiles="config\config.json" DestinationFolder="$(ModDir)\config" Condition="!Exists('$(ModDir)\config\config.json')" />
+  </Target>
+
+  <Target Name="PackageRelease" DependsOnTargets="Build">
+    <PropertyGroup>
+      <StagingDir>$(MSBuildProjectDirectory)\dist\staging</StagingDir>
+      <ModStageDir>$(StagingDir)\SPT_Runtime\user\mods\$(ModName)</ModStageDir>
+      <ZipPath>$(MSBuildProjectDirectory)\dist\$(ModName)-$(Version)-SPT4.1.x.zip</ZipPath>
+    </PropertyGroup>
+    <RemoveDir Directories="$(StagingDir)" />
+    <MakeDir Directories="$(ModStageDir)\config" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModStageDir)" />
+    <Copy SourceFiles="config\config.json" DestinationFolder="$(ModStageDir)\config" />
+    <Copy SourceFiles="README.md" DestinationFolder="$(ModStageDir)" Condition="Exists('README.md')" />
+    <Copy SourceFiles="LICENSE" DestinationFolder="$(ModStageDir)" Condition="Exists('LICENSE')" />
+    <MakeDir Directories="$(MSBuildProjectDirectory)\dist" />
+    <Delete Files="$(ZipPath)" />
+    <ZipDirectory SourceDirectory="$(StagingDir)" DestinationFile="$(ZipPath)" />
+    <RemoveDir Directories="$(StagingDir)" />
+    <Message Importance="high" Text="Release archive: $(ZipPath)" />
+  </Target>
+</Project>

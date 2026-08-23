@@ -1,0 +1,6 @@
+# build output
+bin/
+obj/
+
+# release archives - deliberately NOT tracked, see README
+dist/
